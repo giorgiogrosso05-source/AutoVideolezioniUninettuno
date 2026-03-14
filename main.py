@@ -666,10 +666,6 @@ def main() -> None:
             except KeyboardInterrupt:
                 shutdown_requested = True
                 logger.info("Interruzione da tastiera, chiusura...")
-                try:
-                    context.close()
-                except Exception as exc:  # noqa: BLE001
-                    logger.warning("Chiusura contesto fallita: %s", exc)
                 return
 
             if completed_log_rotate_on_start:
@@ -862,10 +858,11 @@ def main() -> None:
                         safe_screenshot(page, screenshot_dir, logger, "error")
                     time.sleep(check_interval)
 
-            try:
-                context.close()
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Chiusura contesto fallita: %s", exc)
+            if not shutdown_requested:
+                try:
+                    context.close()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Chiusura contesto fallita: %s", exc)
     except Exception as exc:  # noqa: BLE001
         if shutdown_requested:
             logger.warning("Chiusura forzata completata con avviso: %s", exc)
