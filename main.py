@@ -53,9 +53,12 @@ def resolve_browser_path(config_value: str | None) -> str | None:
                 os.path.join(local_app_data, "Google", "Chrome", "Application", "chrome.exe"),
                 os.path.join(program_files, "Chromium", "Application", "chrome.exe"),
                 os.path.join(program_files_x86, "Chromium", "Application", "chrome.exe"),
+                os.path.join(program_files, "Microsoft", "Edge", "Application", "msedge.exe"),
+                os.path.join(program_files_x86, "Microsoft", "Edge", "Application", "msedge.exe"),
+                os.path.join(local_app_data, "Microsoft", "Edge", "Application", "msedge.exe"),
             ]
         )
-        for name in ["chrome", "chromium"]:
+        for name in ["chrome", "chromium", "msedge"]:
             path = shutil.which(name)
             if path:
                 candidates.append(path)
@@ -591,6 +594,9 @@ def main() -> None:
     stuck_reload_after_attempts = int(config.get("stuck_reload_after_attempts", 2))
     stuck_reload_on_error = bool(config.get("stuck_reload_on_error", True))
     stuck_reload_cooldown_seconds = float(config.get("stuck_reload_cooldown_seconds", 120))
+    allow_playwright_fallback = bool(config.get("allow_playwright_fallback", False))
+    retry_with_fresh_profile = bool(config.get("retry_with_fresh_profile", True))
+    fresh_profile_suffix = str(config.get("fresh_profile_suffix", "_fresh"))
 
     logger = setup_logging(log_dir)
 
@@ -602,26 +608,50 @@ def main() -> None:
     shutdown_requested = False
     try:
         with sync_playwright() as p:
-            def launch_context(executable_path: str | None):
+            def launch_context(executable_path: str | None, profile_dir: Path):
                 return p.chromium.launch_persistent_context(
-                    user_data_dir=str(user_data_dir),
+                    user_data_dir=str(profile_dir),
                     headless=headless,
                     slow_mo=slow_mo,
                     executable_path=executable_path,
                     args=["--autoplay-policy=no-user-gesture-required"],
                 )
 
-            try:
-                context = launch_context(browser_executable_path)
-            except Exception as exc:
-                if browser_executable_path:
+            context = None
+            profile_dir = user_data_dir
+
+            if browser_executable_path:
+                try:
+                    context = launch_context(browser_executable_path, profile_dir)
+                    logger.info("Browser in uso: %s", browser_executable_path)
+                except Exception as exc:
                     logger.warning(
-                        "Avvio con browser di sistema fallito: %s. Riprovo con browser Playwright.",
-                        exc,
+                        "Avvio con browser di sistema fallito: %s.", exc
                     )
-                    context = launch_context(None)
-                else:
-                    raise
+                    if retry_with_fresh_profile:
+                        profile_dir = Path(str(user_data_dir) + fresh_profile_suffix)
+                        try:
+                            context = launch_context(browser_executable_path, profile_dir)
+                            logger.info(
+                                "Browser in uso: %s (profilo nuovo %s)",
+                                browser_executable_path,
+                                profile_dir,
+                            )
+                        except Exception as exc2:
+                            logger.warning(
+                                "Avvio con browser di sistema fallito anche con profilo nuovo: %s",
+                                exc2,
+                            )
+                    if context is None and allow_playwright_fallback:
+                        logger.warning("Riprovo con browser Playwright.")
+                        context = launch_context(None, profile_dir)
+                        logger.info("Browser in uso: Playwright Chromium")
+            else:
+                context = launch_context(None, profile_dir)
+                logger.info("Browser in uso: Playwright Chromium")
+
+            if context is None:
+                raise RuntimeError("Impossibile avviare il browser.")
             page = context.pages[0] if context.pages else context.new_page()
 
             logger.info("Apertura URL: %s", start_url)

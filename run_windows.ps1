@@ -16,9 +16,15 @@ if (-not $uv) {
 }
 
 if ($uv) {
-  Write-Host "Uso uv: creo venv con Python 3.11"
+  Write-Host "Uso uv: preparo venv con Python 3.11"
   uv python install 3.11
-  uv venv --python 3.11 .venv
+  if (Test-Path ".\\.venv\\Scripts\\python.exe") {
+    Write-Host "Venv esistente: riuso .venv"
+  } else {
+    $env:UV_VENV_CLEAR = "1"
+    uv venv --python 3.11 .venv
+    Remove-Item Env:UV_VENV_CLEAR -ErrorAction SilentlyContinue
+  }
   .\.venv\Scripts\Activate.ps1
 } else {
   $py = $null

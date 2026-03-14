@@ -15,9 +15,13 @@ if ! command -v uv >/dev/null 2>&1; then
 fi
 
 if command -v uv >/dev/null 2>&1; then
-  echo "Uso uv: creo venv con Python 3.11"
+  echo "Uso uv: preparo venv con Python 3.11"
   uv python install 3.11
-  UV_VENV_CLEAR=1 uv venv --python 3.11 .venv
+  if [ -x ".venv/bin/python" ]; then
+    echo "Venv esistente: riuso .venv"
+  else
+    UV_VENV_CLEAR=1 uv venv --python 3.11 .venv
+  fi
   source .venv/bin/activate
 else
   PY_BIN=""

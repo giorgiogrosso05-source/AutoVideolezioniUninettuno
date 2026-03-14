@@ -27,6 +27,9 @@
   "stuck_reload_after_attempts": 2,
   "stuck_reload_on_error": true,
   "stuck_reload_cooldown_seconds": 120,
+  "allow_playwright_fallback": false,
+  "retry_with_fresh_profile": true,
+  "fresh_profile_suffix": "_fresh",
   "screenshot_on_error": true,
   "screenshot_dir": "./screenshots",
   "log_dir": "./logs"
