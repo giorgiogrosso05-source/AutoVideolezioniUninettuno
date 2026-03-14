@@ -661,7 +661,16 @@ def main() -> None:
             print("- Se necessario, fai login manualmente.")
             print("- Vai alla pagina della lezione.")
             print("- Quando sei pronto, torna qui e premi INVIO.\n")
-            input("Pronto? Premi INVIO per iniziare... ")
+            try:
+                input("Pronto? Premi INVIO per iniziare... ")
+            except KeyboardInterrupt:
+                shutdown_requested = True
+                logger.info("Interruzione da tastiera, chiusura...")
+                try:
+                    context.close()
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Chiusura contesto fallita: %s", exc)
+                return
 
             if completed_log_rotate_on_start:
                 rotate_log_file(completed_log_path, completed_log_archive_dir, logger)
