@@ -80,9 +80,12 @@ foreach ($c in $chromeCandidates) {
 }
 
 if ($hasSystemBrowser) {
-  Write-Host "Browser di sistema rilevato: salto download browser Playwright"
-} else {
+  Write-Host "Browser di sistema rilevato: installo comunque i browser Playwright come fallback"
+}
+try {
   & $venvPy -m playwright install
+} catch {
+  Write-Host "Installazione browser Playwright fallita (continua comunque)."
 }
 
 & $venvPy main.py

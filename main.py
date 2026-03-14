@@ -602,13 +602,26 @@ def main() -> None:
     shutdown_requested = False
     try:
         with sync_playwright() as p:
-            context = p.chromium.launch_persistent_context(
-                user_data_dir=str(user_data_dir),
-                headless=headless,
-                slow_mo=slow_mo,
-                executable_path=browser_executable_path,
-                args=["--autoplay-policy=no-user-gesture-required"],
-            )
+            def launch_context(executable_path: str | None):
+                return p.chromium.launch_persistent_context(
+                    user_data_dir=str(user_data_dir),
+                    headless=headless,
+                    slow_mo=slow_mo,
+                    executable_path=executable_path,
+                    args=["--autoplay-policy=no-user-gesture-required"],
+                )
+
+            try:
+                context = launch_context(browser_executable_path)
+            except Exception as exc:
+                if browser_executable_path:
+                    logger.warning(
+                        "Avvio con browser di sistema fallito: %s. Riprovo con browser Playwright.",
+                        exc,
+                    )
+                    context = launch_context(None)
+                else:
+                    raise
             page = context.pages[0] if context.pages else context.new_page()
 
             logger.info("Apertura URL: %s", start_url)
