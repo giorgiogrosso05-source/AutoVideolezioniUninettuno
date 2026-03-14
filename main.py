@@ -81,6 +81,27 @@ def resolve_browser_path(config_value: str | None) -> str | None:
     return None
 
 
+def build_profile_candidates(
+    base_dir: Path, retry_with_fresh: bool, fresh_suffix: str
+) -> list[Path]:
+    candidates: list[Path] = [base_dir]
+    if retry_with_fresh:
+        candidates.append(Path(str(base_dir) + fresh_suffix))
+        pid = os.getpid()
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        candidates.append(Path(f"{base_dir}{fresh_suffix}_{pid}"))
+        candidates.append(Path(f"{base_dir}{fresh_suffix}_{timestamp}"))
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            unique.append(candidate)
+            seen.add(key)
+    return unique
+
+
 def setup_logging(log_dir: Path) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
@@ -557,6 +578,9 @@ def main() -> None:
     slow_mo = int(config.get("slow_mo_ms", 0))
     browser_executable_path = resolve_browser_path(config.get("browser_executable_path") or None)
     user_data_dir = Path(config.get("user_data_dir", "./user_data"))
+    env_user_data_dir = os.getenv("USER_DATA_DIR")
+    if env_user_data_dir:
+        user_data_dir = Path(env_user_data_dir)
 
     check_interval = int(config.get("check_interval_seconds", 15))
     keepalive_interval = int(config.get("keepalive_interval_seconds", 120))
@@ -617,38 +641,32 @@ def main() -> None:
                     args=["--autoplay-policy=no-user-gesture-required"],
                 )
 
-            context = None
-            profile_dir = user_data_dir
+            profile_candidates = build_profile_candidates(
+                user_data_dir, retry_with_fresh_profile, fresh_profile_suffix
+            )
+
+            def try_launch_profiles(executable_path: str | None, label: str):
+                for profile_dir in profile_candidates:
+                    try:
+                        context = launch_context(executable_path, profile_dir)
+                        logger.info("Browser in uso: %s (profilo %s)", label, profile_dir)
+                        return context
+                    except Exception as exc:
+                        logger.warning(
+                            "Avvio con %s fallito (profilo %s): %s",
+                            label,
+                            profile_dir,
+                            exc,
+                        )
+                return None
 
             if browser_executable_path:
-                try:
-                    context = launch_context(browser_executable_path, profile_dir)
-                    logger.info("Browser in uso: %s", browser_executable_path)
-                except Exception as exc:
-                    logger.warning(
-                        "Avvio con browser di sistema fallito: %s.", exc
-                    )
-                    if retry_with_fresh_profile:
-                        profile_dir = Path(str(user_data_dir) + fresh_profile_suffix)
-                        try:
-                            context = launch_context(browser_executable_path, profile_dir)
-                            logger.info(
-                                "Browser in uso: %s (profilo nuovo %s)",
-                                browser_executable_path,
-                                profile_dir,
-                            )
-                        except Exception as exc2:
-                            logger.warning(
-                                "Avvio con browser di sistema fallito anche con profilo nuovo: %s",
-                                exc2,
-                            )
-                    if context is None and allow_playwright_fallback:
-                        logger.warning("Riprovo con browser Playwright.")
-                        context = launch_context(None, profile_dir)
-                        logger.info("Browser in uso: Playwright Chromium")
+                context = try_launch_profiles(browser_executable_path, browser_executable_path)
+                if context is None and allow_playwright_fallback:
+                    logger.warning("Riprovo con browser Playwright.")
+                    context = try_launch_profiles(None, "Playwright Chromium")
             else:
-                context = launch_context(None, profile_dir)
-                logger.info("Browser in uso: Playwright Chromium")
+                context = try_launch_profiles(None, "Playwright Chromium")
 
             if context is None:
                 raise RuntimeError("Impossibile avviare il browser.")
