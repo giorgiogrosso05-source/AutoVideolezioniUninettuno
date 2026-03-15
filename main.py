@@ -173,9 +173,23 @@ def parse_total_lessons(value) -> int | None:
     return None if v <= 0 else v
 
 
-def setup_logging(log_dir: Path) -> logging.Logger:
+def setup_logging(
+    log_dir: Path, log_file: Path | None, rotate_on_start: bool
+) -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    if log_file is None:
+        log_path = log_dir / f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    else:
+        log_path = log_file
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        if rotate_on_start and log_path.exists() and log_path.stat().st_size > 0:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            suffix = log_path.suffix or ".log"
+            rotated = log_path.with_name(f"{log_path.stem}_{ts}{suffix}")
+            try:
+                log_path.rename(rotated)
+            except Exception:
+                pass
 
     logger = logging.getLogger("auto_lezioni")
     logger.setLevel(logging.INFO)
@@ -313,14 +327,14 @@ def get_lesson_info(page) -> dict:
           let lessonNumber = '';
           let lessonTitle = '';
           for (const t of texts) {
-            let m = t.match(/Lezione\\s*n\\.\\s*(\\d+)\\s*:\\s*(.+)$/i);
+            let m = t.match(/Lezione\\s*n\\.?\\s*(\\d+)\\s*:\\s*(.+)$/i);
             if (!m) m = t.match(/Lezione\\s*(\\d+)\\s*:\\s*(.+)$/i);
             if (m) {
               lessonNumber = m[1];
               lessonTitle = (m[2] || '').trim();
               break;
             }
-            m = t.match(/Lezione\\s*n\\.\\s*(\\d+)/i);
+            m = t.match(/Lezione\\s*n\\.?\\s*(\\d+)/i);
             if (m) {
               lessonNumber = m[1];
               break;
@@ -555,6 +569,16 @@ def try_play_video(page, selector: str | None, logger: logging.Logger) -> None:
             """
             (sel) => {
               const v = sel ? document.querySelector(sel) : document.querySelector('video');
+              const vjs = (window.videojs && videojs.players && videojs.players.videojsplayer)
+                ? videojs.players.videojsplayer
+                : null;
+
+              if (vjs && typeof vjs.play === 'function') {
+                try { vjs.muted(true); } catch (e) {}
+                try { vjs.volume(0); } catch (e) {}
+                vjs.play();
+                return;
+              }
               if (!v) return;
               if (v.focus) v.focus();
               if (v.click) v.click();
@@ -1041,6 +1065,9 @@ def main() -> None:
     screenshot_on_error = bool(config.get("screenshot_on_error", True))
     screenshot_dir = Path(config.get("screenshot_dir", "./screenshots"))
     log_dir = Path(config.get("log_dir", "./logs"))
+    log_file_raw = (config.get("log_file") or "").strip()
+    log_file = Path(log_file_raw) if log_file_raw else None
+    log_rotate_on_start = bool(config.get("log_rotate_on_start", False))
     log_video_state = bool(config.get("log_video_state", False))
     end_tail_seconds = float(config.get("end_tail_seconds", 5))
     require_ended = bool(config.get("require_ended", False))
@@ -1079,7 +1106,7 @@ def main() -> None:
     retry_with_fresh_profile = bool(config.get("retry_with_fresh_profile", True))
     fresh_profile_suffix = str(config.get("fresh_profile_suffix", "_fresh"))
 
-    logger = setup_logging(log_dir)
+    logger = setup_logging(log_dir, log_file, log_rotate_on_start)
 
     logger.info("Avvio con headless=%s, slow_mo_ms=%s", headless, slow_mo)
     if browser_executable_path:
@@ -1369,6 +1396,10 @@ def main() -> None:
 
                             if pending_ready and duration <= 0:
                                 if now - last_ready_attempt >= 10:
+                                    logger.info(
+                                        "Tentativo ripristino video (pending_ready): url=%s",
+                                        page.url,
+                                    )
                                     prime_video_autoplay(page, video_selector, logger)
                                     ready = wait_for_video_ready(
                                         page,
@@ -1400,8 +1431,11 @@ def main() -> None:
                                     and not ended
                                 ):
                                     logger.warning(
-                                        "Video bloccato: nessun avanzamento da %.1fs, tento recupero.",
+                                        "Video bloccato: nessun avanzamento da %.1fs (url=%s, t=%.2f/%.2f).",
                                         now - last_progress_time,
+                                        page.url,
+                                        current,
+                                        duration,
                                     )
                                     recover_stuck_video(
                                         page, video_selector, logger, stuck_seek_seconds
@@ -1420,8 +1454,9 @@ def main() -> None:
                                 >= stuck_reload_cooldown_seconds
                             ):
                                 logger.warning(
-                                    "Errore player rilevato (code=%s). Ricarico la pagina.",
+                                    "Errore player rilevato (code=%s, url=%s). Ricarico la pagina.",
                                     state.get("errorCode"),
+                                    page.url,
                                 )
                                 reload_page(page, logger, next_wait_ms)
                                 last_reload_time = now
@@ -1436,8 +1471,9 @@ def main() -> None:
                                 and not ended
                             ):
                                 logger.warning(
-                                    "Troppi tentativi di recupero (%s). Ricarico la pagina.",
+                                    "Troppi tentativi di recupero (%s, url=%s). Ricarico la pagina.",
                                     stuck_attempts,
+                                    page.url,
                                 )
                                 reload_page(page, logger, next_wait_ms)
                                 last_reload_time = now
@@ -1495,6 +1531,11 @@ def main() -> None:
                                 if last_pause_seen is None:
                                     last_pause_seen = now
                                 elif now - last_pause_seen >= pause_grace:
+                                    logger.warning(
+                                        "Video in pausa da %.1fs (url=%s). Provo a riprendere.",
+                                        now - last_pause_seen,
+                                        page.url,
+                                    )
                                     try_play_video(page, video_selector, logger)
                                     last_pause_seen = None
                             else:
@@ -1519,6 +1560,11 @@ def main() -> None:
                                 page_state["no_video_since"] = now
                             elif now - no_video_since >= 20:
                                 if page_state.get("no_video_reloads", 0) < 2:
+                                    logger.warning(
+                                        "Nessun video da %.1fs (url=%s). Ricarico la pagina.",
+                                        now - no_video_since,
+                                        page.url,
+                                    )
                                     reload_page(page, logger, next_wait_ms)
                                     page_state["no_video_reloads"] = (
                                         page_state.get("no_video_reloads", 0) + 1
@@ -1526,7 +1572,8 @@ def main() -> None:
                                     page_state["no_video_since"] = now
                                 else:
                                     logger.warning(
-                                        "Tab senza video da troppo tempo, chiudo."
+                                        "Tab senza video da troppo tempo, chiudo (url=%s).",
+                                        page.url,
                                     )
                                     try:
                                         page.close()
