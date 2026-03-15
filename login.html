@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1.0">
+        <title>Servizio di accesso web</title>
+        <link rel="stylesheet" type="text/css" href="/idp/css/main.css">
+    </head>
+    <body>
+    <div class="wrapper">
+      <div class="container">
+        <header>
+          <img src="/idp/images/logo.png" alt="Università Telematica Internazione UNINETTUNO">
+        </header>
+
+        <div class="content">
+          <div class="column one">
+
+        <div class="language-switcher" style="text-align: right; padding: 10px;">
+      <a href="javascript:void(0);" onclick="setLanguage('it')" id="lang-it" 
+        style="text-decoration: none; padding: 5px;">Italiano</a> | 
+      <a href="javascript:void(0);" onclick="setLanguage('en')" id="lang-en" 
+         style="text-decoration: none; padding: 5px;">English</a>
+    </div>
+          <form action="&#x2f;idp&#x2f;profile&#x2f;SAML2&#x2f;Redirect&#x2f;SSO&#x3f;execution&#x3d;e1s2" method="post">
+
+
+
+            <form action="/idp/profile/SAML2/Redirect/SSO?execution=e1s2" method="post">
+    <input type="hidden" name="csrf_token" value="_902bd5449af22e842169b39b682281d345b61515" />
+
+              <div class="form-element-wrapper">
+                <label for="username">Nome utente</label>
+                <input class="form-element form-field" id="username" name="j_username" type="text"
+                    value="" />
+              </div>
+
+              <div class="form-element-wrapper">
+                <label for="password">Password</label>
+                <input class="form-element form-field" id="password" name="j_password" type="password" value="" />
+              </div>
+
+                                                                                    
+                            
+
+
+              
+                            
+              <div class="form-element-wrapper">
+                <button class="form-element form-button" type="submit" name="_eventId_proceed"
+                    onClick="this.childNodes[0].nodeValue='Accesso in corso, attendere prego...'"
+                    >Accesso</button>
+              </div>
+
+            </form>
+
+            
+
+          </div>
+          <div class="column two">
+            <ul class="list list-help">
+              <li class="list-help-item"><a href="https://www.uninettunouniversity.net/secure/it/forgotpassword.aspx"><span class="item-marker">&rsaquo;</span> Password dimenticata?</a></li>              
+              <li class="list-help-item"><a href="https://www.uninettunouniversity.net/it/domande-frequenti.aspx?unq=1"><span class="item-marker">&rsaquo;</span> Serve aiuto?</a></li>
+              <li class="list-help-item"><a href="https://www.uninettunouniversity.net/it/info-idp.aspx"><span class="item-marker">&rsaquo;</span> Informazioni</a></li>
+              <li class="list-help-item"><a href="https://www.uninettunouniversity.net/it/info-privacy-idp.aspx"><span class="item-marker">&rsaquo;</span> Privacy Policy</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="container container-footer">
+          <p class="footer-text">Università Telematica Internazione UNINETTUNO - Corso Vittorio Emanuele II 39, 00186 Roma - (+39) 0669207670 - CF 97394340588 PI 13937651001</p>
+        </div>
+      </footer>
+    </div>
+
+     </body>
+             <script type="text/javascript">
+  document.addEventListener("DOMContentLoaded", function () {
+    var form = document.querySelector("form");
+    if (form) {
+      form.addEventListener("submit", function () {
+        var input = document.getElementById("username");
+        if (input) {
+          input.value = input.value.toLowerCase();
+        }
+      });
+    }
+  });
+</script>
+      <script>
+(function() {
+    // Funzione per impostare il cookie
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + value + expires + "; path=/; SameSite=Lax";
+    }
+    
+    // Funzione per leggere il cookie
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for(var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    }
+    
+    // Funzione per cambiare lingua
+    window.setLanguage = function(lang) {
+        setCookie('idp_lang', lang, 365);
+        
+        // Preserva tutti i parametri della query string
+        var url = new URL(window.location.href);
+        url.searchParams.set('lang', lang);
+        window.location.href = url.toString();
+    };
+    
+    // Evidenzia la lingua attiva
+    var currentLang = getCookie('idp_lang') || 'it';
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('lang')) {
+        currentLang = urlParams.get('lang');
+        setCookie('idp_lang', currentLang, 365);
+    }
+    
+    var activeLink = document.getElementById('lang-' + currentLang);
+    if (activeLink) {
+        activeLink.style.fontWeight = 'bold';
+        activeLink.style.color = '#000';
+
+    }
+})();
+</script>
+
+</html>

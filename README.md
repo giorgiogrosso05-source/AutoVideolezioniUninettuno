@@ -52,6 +52,10 @@ cp config.example.json config.json
 Apri `config.json` e imposta:
 - `start_url`: la pagina della lezione
 - `next_button_selector`: selettore del pulsante "Successiva"
+- `tabs_count`: valore di default per quante lezioni vuoi guardare (verra' chiesto all'avvio). Usa `max`/`0` per tutte.
+- `max_tabs_per_batch`: massimo numero di tab aperte insieme (default 10)
+- `video_ready_timeout_ms`: attesa massima per considerare il video pronto dopo l'apertura
+- `next_click_retries`: numero di tentativi aggiuntivi per il click su "Successiva"
 - `browser_executable_path` (opzionale): percorso del browser di sistema (se vuoto, prova ad auto-rilevare)
 - `video_selector` (opzionale): selettore del tag video
 - `logout_check_selector` (opzionale): qualcosa che appare quando sei disconnesso
@@ -92,6 +96,8 @@ Alla prima esecuzione:
 
 ## Note utili
 - I dati di sessione vengono salvati in `./user_data/` (non cancellare se vuoi restare loggato)
+- L'automazione non preme piu' "Successiva" a fine lezione: mantiene fino a `max_tabs_per_batch` tab aperte e ne apre una nuova quando una finisce.
+- Se scegli `max`, continuerà ad aprire lezioni finché "Successiva" è disponibile.
 - I log sono in `./logs/`
 - Screenshot automatici (se abilitati) in `./screenshots/`
 
